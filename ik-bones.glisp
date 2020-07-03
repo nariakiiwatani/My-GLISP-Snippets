@@ -1,0 +1,77 @@
+
+(defn fix-distance
+	[base desire distance]
+	(let [angle (vec2/angle (vec2/- desire base))]
+              (vec2/rotate base angle (vec2/+ base [distance 0]))))
+
+(defn make-chain
+	{:params [{:label "src" :type "any"}
+	          {:label "step" :type "number"}
+	          {:overwrap "overwrap" :type "number" :default 0}]
+	}
+	[src step overwrap]
+	(for [base (range 0 (- (count src) (dec step)) (- step overwrap))]
+      (vec (slice src base (+ base step)))
+  )
+)
+(defn ik-nodes
+	{:handles
+		{:draw
+			(fn [{:params [root & params]}]
+					(reduce (fn [a b]
+						          (concat a (let [index (count a)
+                              	length (first b)
+                              	angle (second b)
+                              	lastPos (get (last a) :pos)
+                              	newPos (vec2/+ lastPos (vec2/scale [(cos angle) (sin angle)] length))]
+		                        [{:id index
+				                      :type "point"
+				                      :pos newPos}])))
+           [{:id 0 :type "point" :pos root}] params)
+      )
+     :drag
+    	(fn [{:id id :pos p :prev-pos pp :params [root & params]}]
+    	    (let [delta (vec2/- p pp)
+    	          pos (reduce (fn [a b]
+						          (concat a (let [
+                              	length (first b)
+                              	angle (second b)
+                              	lastPos (last a)
+                              	newPos (vec2/+ lastPos (vec2/scale [(cos angle) (sin angle)] length))
+                              	]
+		                        [newPos]))) [root] params)
+                parents (reverse (reduce (fn [a b] (let [length (first (nth params(- id (count a))))] (concat a [(fix-distance (last a) b length)]))) [p] (reverse (take id pos))))
+                children (reduce (fn [a b] (let [length (first (nth params (+ id (dec (count a)))))] (concat a [(fix-distance (last a) b length)]))) [p] (drop (inc id) pos))
+              	moved (concat parents (rest children))
+               ]
+               (concat [root] (reduce (fn [a b] 
+                                 (let [index (count a)
+                                       from b
+                                       to (nth moved (inc index))
+                                       sub (vec2/- to from)
+                                       ]
+                                    	 (concat a [[(vec2/len sub) (vec2/angle sub)]])
+                                      ))
+                                 [] (butlast moved)))
+								)
+    	    )
+	}}
+	[root & params]
+	(reduce (fn [a b]
+						          (concat a (let [
+                              	length (first b)
+                              	angle (second b)
+                              	lastPos (last a)
+                              	newPos (vec2/+ lastPos (vec2/scale [(cos angle) (sin angle)] length))
+                              	]
+		                        [newPos]))) [root] params)
+
+)
+
+
+; :start-sketch
+
+; (style (stroke "salmon" 10)
+;   (map (fn [[a b]] (line a b)) (make-chain (ik-nodes [0 0] [99.99999999999979 (deg -51.00646543203005)] [79.9999999999998 (deg -82.19188303470777)] [60.00000000000045 (deg -139.56661218131208)] [40.00000000000036 (deg -12.639561041928452)] [20.000000000000092 (deg 29.90834877175287)]) 2 1))
+	
+; )
